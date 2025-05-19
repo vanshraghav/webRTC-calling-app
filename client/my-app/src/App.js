@@ -139,6 +139,7 @@ function App() {
       pcRef.current.close();
       pcRef.current = null;
     }
+    
 
     pcRef.current = new RTCPeerConnection({
       iceServers: [
