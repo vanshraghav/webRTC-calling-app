@@ -134,7 +134,7 @@ function App() {
     }
   };
 
-  const createPeerConnection = async () => {
+  const prepareConnection = async () => {
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
@@ -158,51 +158,9 @@ function App() {
           username: 'openrelayproject',
           credential: 'openrelayproject'
         }
-      ]
+      ],
+      iceTransportPolicy: 'relay' // Prioritize TURN server candidates
     });
-
-    try {
-      console.log('Requesting user media.');
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
-      });
-
-      console.log('Got local stream with tracks:', stream.getTracks().length);
-      if (localAudioRef.current) {
-        localAudioRef.current.srcObject = stream;
-      }
-
-      // Add all audio tracks to peer connection
-      stream.getTracks().forEach((track) => {
-        console.log('Adding track to peer connection:', track.kind);
-        pcRef.current.addTrack(track, stream);
-      });
-    } catch (err) {
-      console.error('Error accessing media devices:', err);
-    }
-
-    pcRef.current.ontrack = (event) => {
-      const [stream] = event.streams;
-      console.log('Remote track received:', event.track.kind);
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.volume = 1.0;
-        remoteAudioRef.current.playsInline = true;
-    
-        // Try to play right away
-        remoteAudioRef.current.play().catch((err) => {
-          console.warn('Autoplay prevented:', err);
-          // Optionally inform the user to click to play audio
-        });
-      }
-    };
-    
 
     pcRef.current.onicecandidate = (e) => {
       if (e.candidate) {
@@ -225,15 +183,33 @@ function App() {
     pcRef.current.onconnectionstatechange = () => {
       console.log('Connection state:', pcRef.current.connectionState);
     };
+
+    try {
+      console.log('Requesting user media...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      stream.getTracks().forEach((track) => {
+        pcRef.current.addTrack(track, stream);
+      });
+    } catch (err) {
+      console.error('Error accessing user media:', err);
+    }
   };
+
+  useEffect(() => {
+    prepareConnection();
+  }, []);
 
   const acceptCall = async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not open, cannot accept call');
       return;
     }
-  
-    await createPeerConnection();
   
     if (!pcOfferRef.current) {
       console.error('No offer SDP available to accept');
@@ -301,8 +277,6 @@ function App() {
       console.warn('WebSocket is not open, cannot start call');
       return;
     }
-
-    await createPeerConnection();
 
     const offer = await pcRef.current.createOffer();
     await pcRef.current.setLocalDescription(offer);
