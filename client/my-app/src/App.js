@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './App.css';
 
-const SIGNAL_SERVER_URL = "wss://signal-websocket.onrender.com"; // Replace with actual deployed WebSocket server URL
+const SIGNAL_SERVER_URL = process.env.REACT_APP_SIGNAL_SERVER_URL; // Replace with actual deployed WebSocket server URL
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
