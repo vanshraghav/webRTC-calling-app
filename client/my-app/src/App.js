@@ -143,9 +143,22 @@ function App() {
     pcRef.current = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        // Add TURN server config if you have one:
-        // { urls: 'turn:your-turn-server.com', username: 'user', credential: 'pass' },
-      ],
+        {
+          urls: 'turn:relay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:relay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:relay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ]
     });
 
     try {
