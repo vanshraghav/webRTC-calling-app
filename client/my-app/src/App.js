@@ -162,7 +162,7 @@ function App() {
     });
 
     try {
-      console.log('Requesting user media...');
+      console.log('Requesting user media.');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
