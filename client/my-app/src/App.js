@@ -4,6 +4,38 @@ import './App.css';
 
 const SIGNAL_SERVER_URL = process.env.REACT_APP_SIGNAL_SERVER_URL; // Replace with actual deployed WebSocket server URL
 
+let wakeLock = null;
+
+const requestWakeLock = async () => {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake lock is active');
+    }
+  } catch (err) {
+    console.error('Failed to acquire wake lock:', err);
+  }
+};
+
+const releaseWakeLock = () => {
+  if (wakeLock) {
+    wakeLock.release().then(() => {
+      console.log('Wake lock released');
+      wakeLock = null;
+    });
+  }
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') {
+    if (callActive) {
+      requestWakeLock();
+    }
+  } else {
+    releaseWakeLock();
+  }
+};
+
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
@@ -11,6 +43,7 @@ function App() {
   const [callActive, setCallActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [incomingCall, setIncomingCall] = useState(false);
+  const [isSpeakerphone, setIsSpeakerphone] = useState(false);
   const pcOfferRef = useRef(null); 
   const localAudioRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -124,8 +157,17 @@ function App() {
         pcRef.current = null;
       }
       queuedCandidates.current = [];
+      releaseWakeLock();
     };
   }, [loggedIn, username]);
+
+  useEffect(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [callActive]);
 
   // Drain queued ICE candidates after remoteDescription is set
   const processQueuedCandidates = async () => {
@@ -320,6 +362,7 @@ function App() {
     }
     setCallActive(false);
     setIsMuted(false);
+    releaseWakeLock(); // Release wake lock when call ends
   };
 
   const toggleMute = () => {
@@ -337,6 +380,17 @@ function App() {
     setIsMuted(newMuteState);
   };
 
+  const toggleSpeakerphone = () => {
+    if (remoteAudioRef.current) {
+      const audioElement = remoteAudioRef.current;
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaElementSource(audioElement);
+      const destination = audioContext.destination;
+      source.connect(destination);
+      setIsSpeakerphone(!isSpeakerphone);
+    }
+  };
+
   const startCall = async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not open, cannot start call');
@@ -345,13 +399,22 @@ function App() {
 
     await createPeerConnection();
 
-    const offer = await pcRef.current.createOffer();
-    await pcRef.current.setLocalDescription(offer);
+    const { currentUserId, otherUserId } = getUserIds();
 
-    const { otherUserId } = getUserIds();
-    wsRef.current.send(JSON.stringify({ type: 'offer', offer, to: otherUserId }));
-
-    setCallActive(true);
+    try {
+      const offer = await pcRef.current.createOffer();
+      await pcRef.current.setLocalDescription(offer);
+      wsRef.current.send(JSON.stringify({
+        type: 'offer',
+        offer,
+        from: currentUserId,
+        to: otherUserId,
+      }));
+      console.log('Offer sent');
+      requestWakeLock(); // Request wake lock when call starts
+    } catch (err) {
+      console.error('Error starting call:', err);
+    }
   };
 
   const monitorNetworkConditions = () => {
@@ -488,6 +551,21 @@ function App() {
               }}
             >
               {isMuted ? 'Unmute' : 'Mute'} Mic
+            </button>
+            <button
+              onClick={toggleSpeakerphone}
+              style={{
+                marginRight: 10,
+                padding: '8px 16px',
+                fontSize: 14,
+                backgroundColor: isSpeakerphone ? '#4CAF50' : '#ff4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'pointer'
+              }}
+            >
+              {isSpeakerphone ? 'Disable Speakerphone' : 'Enable Speakerphone'}
             </button>
             <button
               onClick={hangUp}
