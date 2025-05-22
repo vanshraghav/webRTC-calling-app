@@ -141,11 +141,31 @@ function App() {
     }
     
 
-    pcRef.current = new RTCPeerConnection({
+    pcRef.current =  new RTCPeerConnection({
       iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        // Add TURN server config if you have one:
-        // { urls: 'turn:your-turn-server.com', username: 'user', credential: 'pass' },
+          {
+            urls: "stun:stun.relay.metered.ca:80",
+          },
+          {
+            urls: "turn:global.relay.metered.ca:80",
+            username: "1d5e87c52e2d9f94d3584f49",
+            credential: "3yKvWb37DyCG5243",
+          },
+          {
+            urls: "turn:global.relay.metered.ca:80?transport=tcp",
+            username: "1d5e87c52e2d9f94d3584f49",
+            credential: "3yKvWb37DyCG5243",
+          },
+          {
+            urls: "turn:global.relay.metered.ca:443",
+            username: "1d5e87c52e2d9f94d3584f49",
+            credential: "3yKvWb37DyCG5243",
+          },
+          {
+            urls: "turns:global.relay.metered.ca:443?transport=tcp",
+            username: "1d5e87c52e2d9f94d3584f49",
+            credential: "3yKvWb37DyCG5243",
+          },
       ],
     });
 
