@@ -28,6 +28,12 @@ function App() {
   useEffect(() => {
     if (!loggedIn) return;
 
+    // Initialize peer connection and gather ICE candidates early
+    createPeerConnection();
+
+    // Monitor network conditions
+    monitorNetworkConditions();
+
     wsRef.current = new WebSocket(SIGNAL_SERVER_URL);
 
     wsRef.current.onopen = () => {
@@ -141,33 +147,54 @@ function App() {
     }
     
 
-    pcRef.current =  new RTCPeerConnection({
+    pcRef.current = new RTCPeerConnection({
       iceServers: [
-          {
-            urls: "stun:stun.relay.metered.ca:80",
-          },
-          {
-            urls: "turn:global.relay.metered.ca:80",
-            username: "1d5e87c52e2d9f94d3584f49",
-            credential: "3yKvWb37DyCG5243",
-          },
-          {
-            urls: "turn:global.relay.metered.ca:80?transport=tcp",
-            username: "1d5e87c52e2d9f94d3584f49",
-            credential: "3yKvWb37DyCG5243",
-          },
-          {
-            urls: "turn:global.relay.metered.ca:443",
-            username: "1d5e87c52e2d9f94d3584f49",
-            credential: "3yKvWb37DyCG5243",
-          },
-          {
-            urls: "turns:global.relay.metered.ca:443?transport=tcp",
-            username: "1d5e87c52e2d9f94d3584f49",
-            credential: "3yKvWb37DyCG5243",
-          },
+        // Primary ICE servers
+        {
+          urls: ["stun:bn-turn2.xirsys.com"]
+        },
+        {
+          username: "SkG8Kog7CElvNpiLmt9TY7rayhljky_veLkVTg_Cybk-dsW2dL6Px7qXcQeLP4VKAAAAAGgvaR92YW5zaHJhZ2hhdg==",
+          credential: "5dc3e010-3738-11f0-8c7e-0242ac140004",
+          urls: [
+            "turn:bn-turn2.xirsys.com:80?transport=udp",
+            "turn:bn-turn2.xirsys.com:3478?transport=udp",
+            "turn:bn-turn2.xirsys.com:80?transport=tcp",
+            "turn:bn-turn2.xirsys.com:3478?transport=tcp",
+            "turns:bn-turn2.xirsys.com:443?transport=tcp",
+            "turns:bn-turn2.xirsys.com:5349?transport=tcp"
+          ]
+        },
+        // Fallback ICE servers
+        {
+          urls: "stun:stun.relay.metered.ca:80",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:80",
+          username: "1d5e87c52e2d9f94d3584f49",
+          credential: "3yKvWb37DyCG5243",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:80?transport=tcp",
+          username: "1d5e87c52e2d9f94d3584f49",
+          credential: "3yKvWb37DyCG5243",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443",
+          username: "1d5e87c52e2d9f94d3584f49",
+          credential: "3yKvWb37DyCG5243",
+        },
+        {
+          urls: "turns:global.relay.metered.ca:443?transport=tcp",
+          username: "1d5e87c52e2d9f94d3584f49",
+          credential: "3yKvWb37DyCG5243",
+        }
       ],
     });
+
+    console.log('Configured ICE servers:', pcRef.current.getConfiguration().iceServers);
+
+    console.log(pcRef.current);
 
     try {
       console.log('Requesting user media...');
@@ -219,6 +246,8 @@ function App() {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: 'candidate', candidate: e.candidate, to: otherUserId }));
         }
+      } else {
+        console.log('ICE candidate gathering complete');
       }
     };
 
@@ -232,6 +261,10 @@ function App() {
 
     pcRef.current.onconnectionstatechange = () => {
       console.log('Connection state:', pcRef.current.connectionState);
+      if (pcRef.current.connectionState === 'failed') {
+        console.log('Connection failed, attempting to restart');
+        // Add logic to restart or handle failed connection
+      }
     };
   };
 
@@ -319,6 +352,40 @@ function App() {
     wsRef.current.send(JSON.stringify({ type: 'offer', offer, to: otherUserId }));
 
     setCallActive(true);
+  };
+
+  const monitorNetworkConditions = () => {
+    setInterval(() => {
+      if (navigator.connection) {
+        const { downlink, effectiveType } = navigator.connection;
+        console.log(`Network downlink: ${downlink}, effective type: ${effectiveType}`);
+
+        // Adjust settings based on network conditions
+        if (effectiveType.includes('2g') || downlink < 0.5) {
+          console.log('Poor network conditions detected, adjusting settings...');
+          // Reduce bitrate for audio tracks
+          pcRef.current.getSenders().forEach(sender => {
+            if (sender.track.kind === 'audio') {
+              const params = sender.getParameters();
+              if (!params.encodings) params.encodings = [{}];
+              params.encodings[0].maxBitrate = 20000; // Lower bitrate to 20 kbps
+              sender.setParameters(params).catch(err => console.error('Failed to set parameters:', err));
+            }
+          });
+        } else {
+          console.log('Good network conditions, setting normal bitrate...');
+          // Reset bitrate to normal for audio tracks
+          pcRef.current.getSenders().forEach(sender => {
+            if (sender.track.kind === 'audio') {
+              const params = sender.getParameters();
+              if (!params.encodings) params.encodings = [{}];
+              params.encodings[0].maxBitrate = 64000; // Normal bitrate 64 kbps
+              sender.setParameters(params).catch(err => console.error('Failed to set parameters:', err));
+            }
+          });
+        }
+      }
+    }, 5000); // Check every 5 seconds
   };
 
   if (!loggedIn) {
