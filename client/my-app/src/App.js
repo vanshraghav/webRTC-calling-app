@@ -6,6 +6,28 @@ const SIGNAL_SERVER_URL = process.env.REACT_APP_SIGNAL_SERVER_URL; // Replace wi
 
 let wakeLock = null;
 
+function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [username, setUsername] = useState('');
+  const [partnerOnline, setPartnerOnline] = useState(false);
+  const [callActive, setCallActive] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(false);
+  const [isSpeakerphone, setIsSpeakerphone] = useState(false);
+  const pcOfferRef = useRef(null); 
+  const localAudioRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  const wsRef = useRef(null);
+  const pcRef = useRef(null);
+  const queuedCandidates = useRef([]);
+
+  // Helper to get user IDs from URL hash (simple demo logic)
+  const getUserIds = () => {
+    const currentUserId = window.location.hash.replace('#', '');
+    const otherUserId = currentUserId === 'user1' ? 'user2' : 'user1';
+    return { currentUserId, otherUserId };
+  };
+  
 const requestWakeLock = async () => {
   try {
     if ('wakeLock' in navigator) {
@@ -35,28 +57,6 @@ const handleVisibilityChange = () => {
     releaseWakeLock();
   }
 };
-
-function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
-  const [partnerOnline, setPartnerOnline] = useState(false);
-  const [callActive, setCallActive] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(false);
-  const [isSpeakerphone, setIsSpeakerphone] = useState(false);
-  const pcOfferRef = useRef(null); 
-  const localAudioRef = useRef(null);
-  const remoteAudioRef = useRef(null);
-  const wsRef = useRef(null);
-  const pcRef = useRef(null);
-  const queuedCandidates = useRef([]);
-
-  // Helper to get user IDs from URL hash (simple demo logic)
-  const getUserIds = () => {
-    const currentUserId = window.location.hash.replace('#', '');
-    const otherUserId = currentUserId === 'user1' ? 'user2' : 'user1';
-    return { currentUserId, otherUserId };
-  };
 
   useEffect(() => {
     if (!loggedIn) return;
